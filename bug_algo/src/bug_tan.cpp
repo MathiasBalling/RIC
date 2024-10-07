@@ -1,6 +1,6 @@
-#include "fmt/core.h"
 #include <opencv2/core/mat.hpp>
 #include <opencv2/opencv.hpp>
+#include <vector>
 using namespace cv;
 
 const int LIDAR_MAX_DISTANCE = 50;
@@ -149,14 +149,14 @@ void on_mouse(int event, int x, int y, int flags, void *userdata) {
       if (!start_clicked) {
         start_pos = Point(x, y);
         start_clicked = true;
-        fmt::println("Start position: ({}, {})\n", start_pos.x, start_pos.y);
+        std::println("Start position: ({}, {})\n", start_pos.x, start_pos.y);
       } else if (!end_clicked) {
         goal_pos = Point(x, y);
         end_clicked = true;
-        fmt::println("End position: ({}, {})\n", goal_pos.x, goal_pos.y);
+        std::println("End position: ({}, {})\n", goal_pos.x, goal_pos.y);
       }
     } else {
-      fmt::println("Invalid start position. Please select a white pixel.\n");
+      std::println("Invalid start position. Please select a white pixel.\n");
     }
   }
 }
@@ -207,14 +207,14 @@ int main() {
   setMouseCallback(WINDOW_NAME, NULL, NULL);
 
   // Analyze the image
-  fmt::println("Analyzing the image...");
-  fmt::println("Distance to goal: {:.2f}", distance(start_pos, goal_pos));
-  fmt::println("Starting tangent bug algorithm...");
+  std::println("Analyzing the image...");
+  std::println("Distance to goal: {:.2f}", distance(start_pos, goal_pos));
+  std::println("Starting tangent bug algorithm...");
   // Run the bug algorithm and print the result
   if (bug_tan_algorithm(img_ws1, img_final, start_pos, goal_pos)) {
-    fmt::println("Goal reached!");
+    std::println("Goal reached!");
   } else {
-    fmt::println("Goal not reached!");
+    std::println("Goal not reached!");
   }
 
   // Show the final image

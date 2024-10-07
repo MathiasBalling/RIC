@@ -1,7 +1,6 @@
 #include "bug0.hpp"
 #include "bug1.hpp"
 #include "bug2.hpp"
-#include "fmt/core.h"
 #include <opencv2/core/hal/interface.h>
 #include <opencv2/core/types.hpp>
 #include <opencv2/highgui.hpp>
@@ -21,11 +20,11 @@ void on_mouse(int event, int x, int y, int flags, void *userdata) {
     if (!start_clicked) {
       start_pos = cv::Point(x, y);
       start_clicked = true;
-      fmt::print("Start position: ({}, {})\n", start_pos.x, start_pos.y);
+      std::print("Start position: ({}, {})\n", start_pos.x, start_pos.y);
     } else if (!end_clicked) {
       end_pos = cv::Point(x, y);
       end_clicked = true;
-      fmt::print("End position: ({}, {})\n", end_pos.x, end_pos.y);
+      std::print("End position: ({}, {})\n", end_pos.x, end_pos.y);
     }
   }
 }
@@ -35,7 +34,7 @@ int main() {
   cv::Mat img_ws1 = cv::imread("../../../assets/ws2.png");
   cv::Mat img_final;
   if (img_ws1.empty()) {
-    fmt::println("Could not read the image");
+    std::println("Could not read the image");
     return 1;
   }
 
@@ -60,7 +59,7 @@ int main() {
     }
   }
   // Analyze the image
-  fmt::println("Analyzing the image...");
+  std::println("Analyzing the image...");
   bug0(img_ws1, start_pos, end_pos, img_final);
   cv::imshow(window_name, img_final);
   cv::waitKey(0);

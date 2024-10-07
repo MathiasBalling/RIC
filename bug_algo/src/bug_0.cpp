@@ -1,4 +1,3 @@
-#include "fmt/core.h"
 #include <opencv2/core/mat.hpp>
 #include <opencv2/core/types.hpp>
 #include <opencv2/highgui.hpp>
@@ -13,6 +12,7 @@ bool end_clicked = false;
 const std::string WINDOW_NAME = "Bug0";
 
 double distance(Point2i p1, Point2i p2) {
+  Point end_po2;
   return sqrt(pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2));
 }
 
@@ -48,14 +48,14 @@ void on_mouse(int event, int x, int y, int flags, void *userdata) {
       if (!start_clicked) {
         start_pos = Point(x, y);
         start_clicked = true;
-        fmt::println("Start position: ({}, {})\n", start_pos.x, start_pos.y);
+        std::println("Start position: ({}, {})\n", start_pos.x, start_pos.y);
       } else if (!end_clicked) {
         end_po = Point(x, y);
         end_clicked = true;
-        fmt::println("End position: ({}, {})\n", end_po.x, end_po.y);
+        std::println("End position: ({}, {})\n", end_po.x, end_po.y);
       }
     } else {
-      fmt::println("Invalid start position. Please select a white pixel.\n");
+      std::println("Invalid start position. Please select a white pixel.\n");
     }
   }
 }
@@ -142,12 +142,12 @@ int main() {
   setMouseCallback(WINDOW_NAME, NULL, NULL);
 
   // Analyze the image
-  fmt::println("Analyzing the image...");
-  fmt::println("Distance to goal: {:.0f}", distance(start_pos, end_po));
+  std::println("Analyzing the image...");
+  std::println("Distance to goal: {:.0f}", distance(start_pos, end_po));
   if (bug0_algorithm(img_ws1, img_final, start_pos, end_po)) {
-    fmt::println("Goal reached!");
+    std::println("Goal reached!");
   } else {
-    fmt::println("Goal not reached!");
+    std::println("Goal not reached!");
   }
   waitKey(0);
   destroyAllWindows();

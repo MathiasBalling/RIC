@@ -1,4 +1,3 @@
-#include "fmt/core.h"
 #include <opencv2/core/mat.hpp>
 #include <opencv2/opencv.hpp>
 using namespace cv;
@@ -84,7 +83,7 @@ bool bug_2_algorithm(const Mat &map, Mat &final_map, const Point2i start,
         current_pos = next_pos;
       } else {
         // Start boundary following when obstacle is encountered
-        fmt::print("Obstacle encountered at ({}, {}), starting boundary "
+        std::print("Obstacle encountered at ({}, {}), starting boundary "
                    "following...\n",
                    current_pos.x, current_pos.y);
         following_obstacle = true;
@@ -99,7 +98,7 @@ bool bug_2_algorithm(const Mat &map, Mat &final_map, const Point2i start,
       // the obstacle
       if (on_m_line(next_pos, start, goal) &&
           distance(next_pos, goal) < min_dist_to_goal_on_hit) {
-        fmt::print("Returning to m-line at ({}, {})\n", next_pos.x, next_pos.y);
+        std::print("Returning to m-line at ({}, {})\n", next_pos.x, next_pos.y);
         following_obstacle = false; // Resume m-line movement
         found_closer_m_line = true;
       } else {
@@ -108,7 +107,7 @@ bool bug_2_algorithm(const Mat &map, Mat &final_map, const Point2i start,
 
       // Stop if we're stuck
       if (current_pos == hit_point && !found_closer_m_line) {
-        fmt::print("Goal unreachable due to obstacle!\n");
+        std::print("Goal unreachable due to obstacle!\n");
         return false;
       }
     }
@@ -133,14 +132,14 @@ void on_mouse(int event, int x, int y, int flags, void *userdata) {
       if (!start_clicked) {
         start_pos = Point(x, y);
         start_clicked = true;
-        fmt::println("Start position: ({}, {})\n", start_pos.x, start_pos.y);
+        std::println("Start position: ({}, {})\n", start_pos.x, start_pos.y);
       } else if (!end_clicked) {
         goal_pos = Point(x, y);
         end_clicked = true;
-        fmt::println("End position: ({}, {})\n", goal_pos.x, goal_pos.y);
+        std::println("End position: ({}, {})\n", goal_pos.x, goal_pos.y);
       }
     } else {
-      fmt::println(
+      std::println(
           "Invalid start/goal position. Please select a white pixel.\n");
     }
   }
@@ -193,16 +192,16 @@ int main() {
   setMouseCallback(WINDOW_NAME, NULL, NULL);
 
   // Run the Bug 2 algorithm
-  fmt::println("Analyzing the image...");
-  fmt::println("Distance to goal: {:.2f}", distance(start_pos, goal_pos));
-  fmt::println("Starting Bug 2 algorithm...");
+  std::println("Analyzing the image...");
+  std::println("Distance to goal: {:.2f}", distance(start_pos, goal_pos));
+  std::println("Starting Bug 2 algorithm...");
 
   bool success = bug_2_algorithm(img_ws1, img_final, start_pos, goal_pos);
 
   if (success) {
-    fmt::println("Path found to goal!");
+    std::println("Path found to goal!");
   } else {
-    fmt::println("Goal is unreachable.");
+    std::println("Goal is unreachable.");
   }
 
   // Display the final path
