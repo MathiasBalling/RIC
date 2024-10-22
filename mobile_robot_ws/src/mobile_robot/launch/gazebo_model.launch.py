@@ -17,19 +17,12 @@ def generate_launch_description():
 
     # this is a relative path to the xacro file defining the model
     modelFileRelativePath = "model/robot.xacro"
-    # uncomment this if you want to define your own empty world model
-    # however, then you have to create empty_world. world
-    # this is a relative path to the Gazebo world file
-    # worldFileRelativePath = 'model/empty_world world'
 
     # this is the absolute path to the model
     pathModelFile = os.path.join(
         get_package_share_directory(namePackage), modelFileRelativePath
     )
 
-    # uncomment this if you are using your own world model
-    # this is the absolute path to the world model
-    # pathWorldFile = os.path.join(get_package.share_directory(namePackage),worldFileRelativePath)
     # get the robot description from the xacro model file
     robotDescription = xacro.process_file(pathModelFile).toxml()
     # this is the launch file from the gazebo_ros package
@@ -57,11 +50,17 @@ def generate_launch_description():
     )
 
     # Robot State Publisher Node
-    nodeRobotStatePublisher = Node(
+    robotStatePublisherNode = Node(
         package="robot_state_publisher",
         executable="robot_state_publisher",
         output="screen",
         parameters=[{"robot_description": robotDescription, "use_sim_time": True}],
+    )
+
+    jointStatePublisherNode = Node(
+        package="joint_state_publisher",
+        executable="joint_state_publisher",
+        name="joint_state_publisher",
     )
 
     # this is very important so we can control the robot from ROS2
@@ -80,10 +79,10 @@ def generate_launch_description():
     )
 
     launchDescriptionObject = LaunchDescription()
-    # Add gazeboLaunch
     launchDescriptionObject.add_action(gazeboLaunch)
     launchDescriptionObject.add_action(spawnModelNodeGazebo)
-    launchDescriptionObject.add_action(nodeRobotStatePublisher)
+    launchDescriptionObject.add_action(robotStatePublisherNode)
+    launchDescriptionObject.add_action(jointStatePublisherNode)
     launchDescriptionObject.add_action(start_gazebo_ros_bridge_cmd)
 
     return launchDescriptionObject

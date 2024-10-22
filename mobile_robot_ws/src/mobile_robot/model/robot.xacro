@@ -145,6 +145,7 @@
         <cylinder length="${d}" radius="${r}"/>
       </geometry>
     </collision>
+
     <xacro:inertia_wheel />
   </link>
 
