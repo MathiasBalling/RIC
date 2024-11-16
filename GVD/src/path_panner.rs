@@ -12,7 +12,7 @@ use opencv::{
 const WINDOW_NAME: &str = "Path Panner";
 
 pub fn path_panner(img: &Mat, edges: Vec<Point2i>) {
-    println!("Performing path panner algorithm");
+    println!("Performing path panner algorithm\n");
     let img: Arc<Mutex<Mat>> = Arc::new(Mutex::new(draw_edges(img, edges)));
     named_window(WINDOW_NAME, 0).unwrap();
     move_window(WINDOW_NAME, 650, 515).unwrap();
@@ -22,7 +22,7 @@ pub fn path_panner(img: &Mat, edges: Vec<Point2i>) {
 
     set_mouse_callback(
         WINDOW_NAME,
-        Some(Box::new(move |event, x, y, _flag| {
+        Some(Box::new(move |event, x, y, flag| {
             let mut img_guard = img_clone.lock().unwrap();
             let mut pt_old_guard = pt_old.lock().unwrap();
 
@@ -35,7 +35,7 @@ pub fn path_panner(img: &Mat, edges: Vec<Point2i>) {
                     println!("EVENT_LBUTTONUP: {},{}", x, y);
                 }
                 EVENT_MOUSEMOVE => {
-                    if _flag == EVENT_LBUTTONDOWN {
+                    if flag == EVENT_LBUTTONDOWN {
                         let color = Scalar::from((0, 255, 0)); // BGR
                         let thickness = 2;
                         line(

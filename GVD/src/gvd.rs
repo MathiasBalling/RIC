@@ -16,7 +16,7 @@ const EDGE_LABEL: u8 = 254;
 const DIRECTIONS: [(i32, i32); 4] = [(0, 1), (1, 0), (0, -1), (-1, 0)];
 
 pub fn gvd(img: &Mat, dtm_img: &Mat, mut obstacle_queue: VecDeque<core::Point2i>) -> Vec<Point2i> {
-    println!("Performing Generalized Voronoi Diagram (GVD) algorithm");
+    println!("Performing Generalized Voronoi Diagram (GVD) algorithm\n");
 
     let mut obstacle_label_map = Mat::new_rows_cols_with_default(
         img.rows(),

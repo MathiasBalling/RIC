@@ -10,7 +10,7 @@ use crate::util::{is_obstacle, is_valid_position};
 const WINDOW_NAME: &str = "Brushfire";
 
 pub fn brushfire(img: &Mat) -> (Mat, VecDeque<Point2i>) {
-    println!("Performing brushfire algorithm");
+    println!("Performing brushfire algorithm\n");
 
     let mut distance_map =
         Mat::new_rows_cols_with_default(img.rows(), img.cols(), img.typ(), Scalar::all(255.0))
