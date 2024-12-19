@@ -1,0 +1,39 @@
+[package]
+name = "rclrs_explorer"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "explorer"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { version = "1", features = ["backtrace"] }
+
+[dependencies.rclrs]
+version = "0.4"
+
+[dependencies.rosidl_runtime_rs]
+version = "0.4"
+
+[dependencies.std_msgs]
+version = "*"
+
+
+[dependencies.nav_msgs]
+version = "*"
+
+[dependencies.unique_identifier_msgs]
+version = "*"
+
+[dependencies.geometry_msgs]
+version = "*"
+
+[dependencies.geographic_msgs]
+version = "*"
+
+[dependencies.nav2_msgs]
+version = "*"
+
+# [package.metadata.ros]
+# install_to_share = ["launch"]
