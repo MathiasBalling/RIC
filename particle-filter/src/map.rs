@@ -70,10 +70,12 @@ impl Map {
         &mut self.data
     }
 
+    /// Checks if the position is valid with bounds checking.
     pub fn is_valid(&self, x: i32, y: i32) -> bool {
         x >= 0 && x < self.data.cols() && y >= 0 && y < self.data.rows()
     }
 
+    /// Checks if the position is occupied by an obstacle with bounds checking.
     pub fn is_occupied(&self, x: i32, y: i32) -> bool {
         self.is_valid(x, y) && {
             let pixel = self

@@ -21,7 +21,7 @@ double distance(Vec2f p1, Vec2f p2) { return norm(p2 - p1); }
 Vec2f normalize(Vec2f vec) { return vec / norm(vec); }
 
 // Check if a point is within the boundaries of the map and on white
-bool is_valid(Point2i point, const Mat &map) {
+bool is_free_space(Point2i point, const Mat &map) {
   if (point.x < 0 || point.x >= map.cols || point.y < 0 ||
       point.y >= map.rows) {
     return false;
@@ -44,7 +44,7 @@ void on_mouse(int event, int x, int y, int flags, void *userdata) {
   (void)flags; // Prevent unused variable warning
   Mat *mat = (Mat *)userdata;
   if (event == EVENT_LBUTTONDOWN) {
-    if (is_valid(Point2i(x, y), *mat)) {
+    if (is_free_space(Point2i(x, y), *mat)) {
       if (!start_clicked) {
         start_pos = Point(x, y);
         start_clicked = true;
@@ -72,7 +72,7 @@ bool bug0_algorithm(const Mat &map, Mat &final_map, const Point2i start,
     if (waitKey(20) == 'q') {
       return false;
     }
-    if (is_valid(next, map)) {
+    if (is_free_space(next, map)) {
       last_position = current;
       current = next;
     } else {
@@ -83,7 +83,7 @@ bool bug0_algorithm(const Mat &map, Mat &final_map, const Point2i start,
         Point2i point(current.x + step_size * cos(deg2rad(i)),
                       current.y + step_size * sin(deg2rad(i)));
 
-        if (is_valid(point, map)) {
+        if (is_free_space(point, map)) {
           double dist = distance(point, goal);
           // Should be further than the step size away
           bool has_visited = distance(point, last_position) < (step_size * 1.5);

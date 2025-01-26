@@ -1,16 +1,20 @@
 #include <opencv2/core/mat.hpp>
 #include <opencv2/opencv.hpp>
-#include <vector>
 using namespace cv;
 
-const int LIDAR_MAX_DISTANCE = 50;
-const int LIDAR_ANGLE_STEP = 5;
+static const int LIDAR_MAX_DISTANCE = 50;
+static const int LIDAR_ANGLE_STEP = 5;
 
-Point start_pos;
-Point goal_pos;
-bool start_clicked = false;
-bool end_clicked = false;
-const std::string WINDOW_NAME = "Tanget Bug Algorithm";
+static Point start_pos;
+static Point goal_pos;
+static bool start_clicked = false;
+static bool end_clicked = false;
+static const std::string WINDOW_NAME = "Tanget Bug Algorithm";
+
+enum class TanBugMode {
+  ToGoal,
+  BoundaryFollowing,
+};
 
 double distance(Point2i p1, Point2i p2) {
   return sqrt(pow(p1.x - p2.x, 2) + pow(p1.y - p2.y, 2));
@@ -21,22 +25,19 @@ double distance(Vec2f p1, Vec2f p2) { return norm(p2 - p1); }
 Vec2f normalize(Vec2f vec) { return vec / norm(vec); }
 
 // Check if a point is within the boundaries of the map and on white
-bool is_valid(Point2i point, const Mat &map) {
+bool is_free_space(Point2i point, const Mat &map) {
   if (point.x < 0 || point.x >= map.cols || point.y < 0 ||
       point.y >= map.rows) {
     return false;
   }
   return map.at<Vec3b>(point) == Vec3b(255, 255, 255);
 }
+
 double deg2rad(double deg) { return deg * M_PI / 180; }
 
-bool boundary_to_close(Point2i point, const Mat &map, const Point2i goal) {
-  (void)map; // Prevent unused variable
-  return distance(point, goal) < 5;
-}
-
 bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2i start,
-                       const Point2i goal, const int step_size = 5) {
+                       const Point2i goal, const bool animate = true,
+                       const int step_size = 5) {
   Vec2f goal_pos = Vec2f(goal.x, goal.y);
   Vec2f last_direction = Vec2f(0, 0);
   Point2i current_pos_point = start;
@@ -56,7 +57,7 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2i start,
       Point2i new_pos =
           current_pos_point +
           Point2i(direction[0] * step_size * i, direction[1] * step_size * i);
-      if (!is_valid(new_pos, map)) {
+      if (!is_free_space(new_pos, map)) {
         max_distance = distance(current_pos, Vec2f(new_pos.x, new_pos.y));
         break;
       } else if (distance(new_pos, goal) < step_size) {
@@ -73,7 +74,7 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2i start,
       uint16_t max_steps = LIDAR_MAX_DISTANCE;
       for (size_t j = 0; j < max_steps; j++) {
         Vec2f new_pos = current_pos + direction_i * (float)j;
-        if (!is_valid(Point2i(new_pos[0], new_pos[1]), map)) {
+        if (!is_free_space(Point2i(new_pos[0], new_pos[1]), map)) {
           max_steps = j;
           float weighted_direction =
               (LIDAR_MAX_DISTANCE - distance(new_pos, current_pos)) /
@@ -83,21 +84,25 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2i start,
           break;
         }
       }
-      // Draw the direction vector
-      Point2i direction_end =
-          current_pos_point +
-          Point2i(direction_i[0] * max_steps, direction_i[1] * max_steps);
-      // Red color if it is hitting the obstacle
-      Scalar color = Scalar(0, 255, 0);
-      if (max_steps < LIDAR_MAX_DISTANCE) {
-        color = Scalar(0, 0, 255);
+      if (animate) {
+        // Draw the direction vector
+        Point2i direction_end =
+            current_pos_point +
+            Point2i(direction_i[0] * max_steps, direction_i[1] * max_steps);
+        // Red color if it is hitting the obstacle
+        Scalar color = Scalar(0, 255, 0);
+        if (max_steps < LIDAR_MAX_DISTANCE) {
+          color = Scalar(0, 0, 255);
+        }
+        line(temp_map, current_pos_point, direction_end, color, 1);
       }
-      line(temp_map, current_pos_point, direction_end, color, 1);
     }
     direction_result += last_direction * 150;
 
-    imshow(WINDOW_NAME, temp_map);
-    if (waitKey(50) == 'q') {
+    if (animate) {
+      imshow(WINDOW_NAME, temp_map);
+    }
+    if (waitKey(1) == 'q') {
       return false;
     }
     direction_result = normalize(direction_result);
@@ -106,7 +111,7 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2i start,
                                     direction_result[1] * step_size);
     bool has_visited =
         distance(next_pos_point, last_pos_point) < (step_size * 1.5);
-    if (has_visited || !is_valid(next_pos_point, map)) {
+    if (has_visited || !is_free_space(next_pos_point, map)) {
       double min_distance = std::numeric_limits<double>::max();
       Point2i closest_point = current_pos_point;
       for (int i = 0; i < 360; i += 10) {
@@ -116,7 +121,7 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2i start,
         direction_i = rotationMatrix * direction_i;
         Point2i point = current_pos_point + Point2i(direction_i[0] * step_size,
                                                     direction_i[1] * step_size);
-        if (is_valid(point, map)) {
+        if (is_free_space(point, map)) {
           double dist = distance(point, goal);
           bool has_visited =
               distance(point, last_pos_point) < (step_size * 1.5);
@@ -145,7 +150,7 @@ void on_mouse(int event, int x, int y, int flags, void *userdata) {
   (void)flags; // Prevent unused variable warning
   Mat *mat = (Mat *)userdata;
   if (event == EVENT_LBUTTONDOWN) {
-    if (is_valid(Point2i(x, y), *mat)) {
+    if (is_free_space(Point2i(x, y), *mat)) {
       if (!start_clicked) {
         start_pos = Point(x, y);
         start_clicked = true;
@@ -181,45 +186,55 @@ int main() {
   Mat img_ws1 = make_map();
   // Optionally load an image
   img_ws1 = imread("../../../assets/ws4.png");
-  // Make a copy of the map for the final path
-  Mat img_final = img_ws1.clone();
+  while (1) {
+    // Make a copy of the map for the final path
+    Mat img_final = img_ws1.clone();
 
-  // Make window and get start/end points
-  namedWindow(WINDOW_NAME);                          // Create the window
-  setMouseCallback(WINDOW_NAME, on_mouse, &img_ws1); // Set the on_mouse
-  while (true) {
-    // Clone the edges image
-    Mat img_ws1_temp = img_ws1.clone();
-    if (start_clicked) {
-      circle(img_ws1_temp, start_pos, 5, Scalar(0, 0, 255), FILLED);
+    // Make window and get start/end points
+    namedWindow(WINDOW_NAME);                          // Create the window
+    setMouseCallback(WINDOW_NAME, on_mouse, &img_ws1); // Set the on_mouse
+    while (true) {
+      // Clone the edges image
+      Mat img_ws1_temp = img_ws1.clone();
+      if (start_clicked) {
+        circle(img_ws1_temp, start_pos, 5, Scalar(0, 0, 255), FILLED);
+      }
+      if (end_clicked) {
+        circle(img_ws1_temp, goal_pos, 5, Scalar(0, 0, 255), FILLED);
+        img_final = img_ws1_temp.clone();
+        break;
+      }
+      imshow(WINDOW_NAME, img_ws1_temp);
+      if (waitKey(100) == 'q') {
+        destroyAllWindows();
+        return 0;
+      }
     }
-    if (end_clicked) {
-      circle(img_ws1_temp, goal_pos, 5, Scalar(0, 0, 255), FILLED);
-      img_final = img_ws1_temp.clone();
+    // Remove the mouse callback
+    setMouseCallback(WINDOW_NAME, NULL, NULL);
+
+    // Analyze the image
+    std::println("Analyzing the image...");
+    std::println("Straight distance to goal: {:.2f}",
+                 distance(start_pos, goal_pos));
+    std::println("Starting tangent bug algorithm...");
+    // Run the bug algorithm and print the result
+    if (bug_tan_algorithm(img_ws1, img_final, start_pos, goal_pos, false)) {
+      std::println("Goal reached!");
+    } else {
+      std::println("Goal not reached!");
+    }
+
+    // Show the final image
+    imshow(WINDOW_NAME, img_final);
+    if (waitKey(0) == 'q') {
       break;
-    }
-    imshow(WINDOW_NAME, img_ws1_temp);
-    if (waitKey(100) == 'q') {
-      return 0;
+    } else {
+      // Reset for new run
+      start_clicked = false;
+      end_clicked = false;
     }
   }
-  // Remove the mouse callback
-  setMouseCallback(WINDOW_NAME, NULL, NULL);
-
-  // Analyze the image
-  std::println("Analyzing the image...");
-  std::println("Distance to goal: {:.2f}", distance(start_pos, goal_pos));
-  std::println("Starting tangent bug algorithm...");
-  // Run the bug algorithm and print the result
-  if (bug_tan_algorithm(img_ws1, img_final, start_pos, goal_pos)) {
-    std::println("Goal reached!");
-  } else {
-    std::println("Goal not reached!");
-  }
-
-  // Show the final image
-  imshow(WINDOW_NAME, img_final);
-  waitKey(0);
   destroyAllWindows();
   return 0;
 }

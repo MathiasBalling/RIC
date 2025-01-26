@@ -20,7 +20,7 @@ Vec2f normalize(Vec2f vec) { return vec / norm(vec); }
 
 // Check if a point is within the boundaries of the map and is on white (free
 // space)
-bool is_valid(Point2i point, const Mat &map) {
+bool is_free_space(Point2i point, const Mat &map) {
   if (point.x < 0 || point.x >= map.cols || point.y < 0 ||
       point.y >= map.rows) {
     return false;
@@ -53,7 +53,7 @@ Point2i follow_boundary(const Point2i &current_pos, const Mat &map) {
 
   for (const auto &neighbor : neighbors) {
     Point2i new_pos = current_pos + neighbor;
-    if (is_valid(new_pos, map)) {
+    if (is_free_space(new_pos, map)) {
       return new_pos; // Return first valid position found
     }
   }
@@ -79,7 +79,7 @@ bool bug_2_algorithm(const Mat &map, Mat &final_map, const Point2i start,
                                                direction[1] * STEP_SIZE);
 
       // Check if next position is valid
-      if (is_valid(next_pos, map)) {
+      if (is_free_space(next_pos, map)) {
         current_pos = next_pos;
       } else {
         // Start boundary following when obstacle is encountered
@@ -128,7 +128,7 @@ void on_mouse(int event, int x, int y, int flags, void *userdata) {
   (void)flags; // Prevent unused variable warning
   Mat *mat = (Mat *)userdata;
   if (event == EVENT_LBUTTONDOWN) {
-    if (is_valid(Point2i(x, y), *mat)) {
+    if (is_free_space(Point2i(x, y), *mat)) {
       if (!start_clicked) {
         start_pos = Point(x, y);
         start_clicked = true;
