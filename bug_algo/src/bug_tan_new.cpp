@@ -1,4 +1,3 @@
-#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -78,6 +77,14 @@ bool is_free_space(Point2d point, const Mat &map) {
 
 double deg2rad(double deg) { return deg * M_PI / 180; }
 
+double path_distance(std::vector<Point2d> path) {
+  double len = 0.;
+  for (size_t i = 0; i < path.size() - 1; i++) {
+    len += distance(path.at(i), path.at(i + 1));
+  }
+  return len;
+}
+
 LidarData find_closest_q_point(std::vector<LidarData> lidar, Point2d goal) {
   // Find closest obstacle egde to goal else go to BoundaryFollowing
   std::vector<LidarData> q_points;
@@ -127,6 +134,7 @@ LidarData find_closest_lidar(std::vector<LidarData> lidar) {
 bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2d start,
                        const Point2d goal, const bool animate = true,
                        const double step_size = 4.0) {
+  std::vector<Point2d> path = {start};
   TanBugMode state = TanBugMode::ToGoal;
   Point2d cur_pos = start;
   Vec2d cur_dir = normalize((Vec2d)(goal - cur_pos));
@@ -314,6 +322,7 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2d start,
         }
         // Else keep original
       }
+
       Point2d temp_pos = cur_pos;
       cur_pos = cur_pos + (Point2d)(perp_tang * dir * step_size);
       if (!is_free_space(cur_pos, map)) {
@@ -339,6 +348,7 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2d start,
     }
     }
 
+    path.push_back(cur_pos);
     if (animate) {
       std::string text;
       switch (state) {
@@ -358,6 +368,7 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2d start,
     }
   }
 
+  std::println("Len:{}", path_distance(path));
   return true;
 }
 
@@ -400,7 +411,7 @@ int main() {
   // Create a the map
   Mat img_ws1 = make_map();
   // Optionally load an image
-  img_ws1 = imread("../../../assets/ws5.png");
+  img_ws1 = imread("../../../assets/ws3.png");
   while (1) {
     // Make a copy of the map for the final path
     Mat img_final = img_ws1.clone();

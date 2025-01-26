@@ -18,4 +18,6 @@ target_link_libraries(bug_tan PRIVATE ${OpenCV_LIBS})
 
 add_executable(bug_tan_new bug_tan_new.cpp)
 target_link_libraries(bug_tan_new PRIVATE ${OpenCV_LIBS})
+add_executable(bug_0_new bug_0_new.cpp)
+target_link_libraries(bug_0_new PRIVATE ${OpenCV_LIBS})
 
