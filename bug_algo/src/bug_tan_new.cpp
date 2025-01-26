@@ -1,17 +1,22 @@
+#include <array>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <format>
 #include <opencv2/core.hpp>
 #include <opencv2/core/matx.hpp>
 #include <opencv2/core/types.hpp>
 #include <opencv2/highgui.hpp>
 #include <opencv2/opencv.hpp>
 #include <print>
+#include <unordered_set>
 #include <vector>
 using namespace cv;
 
-static const int LIDAR_MAX_DISTANCE = 50;
-static const int LIDAR_ANGLE_STEP = 1;
+static const double LIDAR_ANGLE_STEP = 1.;
+static const double LIDAR_DISTANCE_STEP = 0.1;
+static const double LIDAR_MAX_DISTANCE = 50.;
+static const double MIN_DISTANCE_WALL = LIDAR_MAX_DISTANCE / 3.;
 
 static Point2d s_start_pos;
 static Point2d s_goal_pos;
@@ -35,10 +40,32 @@ double distance(Point2d p1, Point2d p2) { return norm(p2 - p1); }
 
 double distance(Vec2d p1, Vec2d p2) { return norm(p2 - p1); }
 
+double calculateAngle(const Vec2d vec1, const Vec2d vec2) {
+  // Calculate the dot product
+  double dotProduct = vec1.dot(vec2);
+  // Calculate the magnitudes of the vectors
+  double magnitude1 = norm(vec1);
+  double magnitude2 = norm(vec2);
+
+  // Calculate the cosine of the angle
+  double cosTheta = dotProduct / (magnitude1 * magnitude2);
+
+  // Clamp cosTheta to avoid numerical errors (values slightly outside [-1, 1])
+  cosTheta = std::max(-1.0, std::min(1.0, cosTheta));
+
+  // Calculate the angle in radians
+  double angle = std::acos(cosTheta);
+
+  return angle;
+}
+
 Vec2d perpendicular_tangent(Point2d p1, Point2d p2) {
   Vec2d vec = p2 - p1;
   return normalize(Vec2d(-vec[1], vec[0]));
 }
+Matx22d rotationMatrix(double theta) {
+  return Matx22d(cos(theta), -sin(theta), sin(theta), cos(theta));
+};
 
 // Check if a point is within the boundaries of the map and on white
 bool is_free_space(Point2d point, const Mat &map) {
@@ -51,23 +78,17 @@ bool is_free_space(Point2d point, const Mat &map) {
 
 double deg2rad(double deg) { return deg * M_PI / 180; }
 
-LidarData find_closest_q_points(std::vector<LidarData> lidar, Point2d goal) {
+LidarData find_closest_q_point(std::vector<LidarData> lidar, Point2d goal) {
   // Find closest obstacle egde to goal else go to BoundaryFollowing
-  // Goal is always first element
-  LidarData goal_dir = lidar.at(0);
-  if (goal_dir.distance == LIDAR_MAX_DISTANCE) {
-    // Free to goal, obstacle check already done
-    return goal_dir;
-  }
   std::vector<LidarData> q_points;
   for (size_t i = 0; i < lidar.size(); i++) {
     size_t left_idx = i == 0 ? lidar.size() - 1 : i - 1;
     size_t right_idx = i == lidar.size() - 1 ? 0 : i + 1;
 
     // Find the Q-points
-    int i_dist = lidar.at(i).distance;
-    int left_dist = lidar.at(left_idx).distance;
-    int right_dist = lidar.at(right_idx).distance;
+    double i_dist = lidar.at(i).distance;
+    double left_dist = lidar.at(left_idx).distance;
+    double right_dist = lidar.at(right_idx).distance;
     if (i_dist != LIDAR_MAX_DISTANCE &&
         (i_dist > left_dist || left_dist == LIDAR_MAX_DISTANCE) &&
         (i_dist > right_dist || right_dist == LIDAR_MAX_DISTANCE)) {
@@ -83,9 +104,11 @@ LidarData find_closest_q_points(std::vector<LidarData> lidar, Point2d goal) {
   // Use the heuristic: d(x,Qi) + d(Qi,goal)
   double closest_q_point_dist =
       distance(closest_q_point.position, goal) + closest_q_point.distance;
-  for (const auto p : q_points) {
-    if ((distance(p.position, goal) + p.distance) < closest_q_point_dist) {
-      closest_q_point = p;
+  for (const auto q : q_points) {
+    double p_dist = distance(q.position, goal) + q.distance;
+    if (p_dist < closest_q_point_dist) {
+      closest_q_point = q;
+      closest_q_point_dist = p_dist;
     }
   }
   return closest_q_point;
@@ -107,11 +130,13 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2d start,
   TanBugMode state = TanBugMode::ToGoal;
   Point2d cur_pos = start;
   Vec2d cur_dir = normalize((Vec2d)(goal - cur_pos));
+  Vec2d last_dir = normalize((Vec2d)(cur_pos - goal));
 
   double dist_reach = distance(start, goal);
   double dist_followed = dist_reach;
 
-  std::vector<Point2d> visited_positions;
+  std::unordered_set<std::string> visited_positions;
+  visited_positions.insert(std::format("{},{}", (int)start.x, (int)start.y));
 
   Mat lidar_map;
 
@@ -129,29 +154,27 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2d start,
     for (size_t angle = 0; angle < 360; angle += LIDAR_ANGLE_STEP) {
       // angle = 0 is goal direction.
       double theta = deg2rad(angle);
-      Matx22d rotationMatrix(cos(theta), -sin(theta), sin(theta), cos(theta));
 
-      Vec2d direction_i = rotationMatrix * goal_dir;
+      Vec2d direction_i = rotationMatrix(theta) * goal_dir;
 
       double max_steps = LIDAR_MAX_DISTANCE;
-      for (double len = 0.0; len < max_steps; len += 0.3) {
-
+      Point2d direction_end;
+      for (double len = LIDAR_DISTANCE_STEP; len < max_steps;
+           len += LIDAR_DISTANCE_STEP) {
         Vec2d dir_len = direction_i * len;
-        Point2d lidar_point = cur_pos + (Point2d)dir_len;
-        lidar_point.x = round(lidar_point.x);
-        lidar_point.y = round(lidar_point.y);
+        direction_end = cur_pos + (Point2d)dir_len;
 
-        if (!is_free_space(lidar_point, map)) {
+        if (!is_free_space(direction_end, map)) {
+          direction_end = cur_pos + (Point2d)dir_len;
           max_steps = len;
           break;
         }
       }
-      Point2d direction_end = cur_pos + (Point2d)(direction_i * max_steps);
       lidar.push_back(LidarData(angle, max_steps, direction_end));
       if (animate) {
         // Blue color if it is hitting the obstacle
         if (max_steps < LIDAR_MAX_DISTANCE) {
-          Scalar color = Scalar(255, 0, 0);
+          Scalar color = Scalar(0, 0, 255);
           circle(lidar_map, direction_end, 2, color, FILLED);
         }
       }
@@ -160,60 +183,77 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2d start,
     // Go straight to Goal or nearest Q point to goal
     switch (state) {
     case TanBugMode::ToGoal: {
-      LidarData best_q_point = find_closest_q_points(lidar, goal);
-
       LidarData closest_obstacle = find_closest_lidar(lidar);
-      if ((best_q_point.angle == 0 &&
-           best_q_point.distance == LIDAR_MAX_DISTANCE) ||
+      LidarData goal_dir_lidar = lidar.at(0);
+      if ((goal_dir_lidar.angle == 0 &&
+           goal_dir_lidar.distance >= LIDAR_MAX_DISTANCE) ||
           distance(cur_pos, goal) < LIDAR_MAX_DISTANCE) {
-        if (closest_obstacle.distance < LIDAR_MAX_DISTANCE / 2. &&
+        ///////////// Direct to goal /////////////
+        Vec2d wall_vec =
+            normalize((Vec2d)(closest_obstacle.position - cur_pos)) * 0.5;
+        // Move away from wall if we get too close
+        if (closest_obstacle.distance < MIN_DISTANCE_WALL &&
             distance(cur_pos, goal) >= LIDAR_MAX_DISTANCE) {
-          goal_dir -=
-              normalize((Vec2d)(closest_obstacle.position - cur_pos)) * 0.8;
-          goal_dir = normalize(goal_dir);
+          goal_dir = normalize(goal_dir - wall_vec);
         }
+        last_dir = cur_dir;
         cur_dir = goal_dir;
         cur_pos += (Point2d)(goal_dir * step_size);
         putText(lidar_map, "Using goal", Point(final_map.cols / 2, 100),
                 FONT_HERSHEY_SIMPLEX, 0.6, Scalar(0, 0, 0), 2);
+        if (visited_positions.contains(
+                std::format("{},{}", (int)cur_pos.x, (int)cur_pos.y))) {
+          return false;
+        } else {
+          visited_positions.insert(
+              std::format("{},{}", (int)cur_pos.x, (int)cur_pos.y));
+        }
       } else {
+        ///////////// Using Q-points /////////////
+        LidarData best_q_point = find_closest_q_point(lidar, goal);
+        circle(lidar_map, best_q_point.position, 5, Scalar(255, 0, 0), FILLED);
         putText(lidar_map, "Using Q points", Point(final_map.cols / 2, 100),
                 FONT_HERSHEY_SIMPLEX, 0.6, Scalar(0, 0, 0), 2);
         // Check if we are moving closer
         double best_q_point_hueristic =
             distance(best_q_point.position, goal) + best_q_point.distance;
-        if (best_q_point_hueristic < dist_followed) {
+        if (best_q_point_hueristic <= dist_followed) {
           dist_followed = best_q_point_hueristic;
         } else {
           state = TanBugMode::BoundaryFollowing;
           break;
         }
-
         // Follow perpendicular with the obstacle
         Vec2d perp_tang =
             perpendicular_tangent(cur_pos, closest_obstacle.position);
-
-        circle(lidar_map, closest_obstacle.position, 5, Scalar(255, 0, 0),
-               FILLED);
         // Dot product to see if they point the same dir.
-        double dot = perp_tang.dot(goal_dir);
-        double dir = 1;
-        if (dot < 0) {
-          dir = -1;
+        double dot = perp_tang.dot(best_q_point.position - cur_pos);
+        double dir = dot < 0. ? -1. : 1.;
+        Vec2d wall_vec =
+            normalize((Vec2d)(closest_obstacle.position - cur_pos)) * 0.15 *
+            dir;
+        if (closest_obstacle.distance < MIN_DISTANCE_WALL) {
+          perp_tang = normalize(perp_tang - wall_vec);
+        } else {
+          perp_tang = normalize(perp_tang + wall_vec);
         }
-        if (closest_obstacle.distance < LIDAR_MAX_DISTANCE / 2.) {
-          perp_tang -=
-              normalize((Vec2d)(closest_obstacle.position - cur_pos)) * 0.2;
-          normalize(perp_tang);
-        }
+        last_dir = cur_dir;
         cur_dir = perp_tang * dir;
         cur_pos = cur_pos + (Point2d)(perp_tang * dir * step_size);
+        if (visited_positions.contains(
+                std::format("{},{}", (int)cur_pos.x, (int)cur_pos.y))) {
+          return false;
+        } else {
+          visited_positions.insert(
+              std::format("{},{}", (int)cur_pos.x, (int)cur_pos.y));
+        }
       }
       break;
     }
 
     case TanBugMode::BoundaryFollowing: {
       LidarData closest_obstacle = find_closest_lidar(lidar);
+      LidarData best_q_point = find_closest_q_point(lidar, goal);
 
       // Follow perpendicular with the obstacle
       Vec2d perp_tang =
@@ -221,27 +261,80 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2d start,
 
       // Dot product to see if they point the same dir.
       double dot = perp_tang.dot(cur_dir);
-      double dir = 1;
-      if (dot < 0) {
-        dir = -1;
-      }
-      if (closest_obstacle.distance < LIDAR_MAX_DISTANCE / 2.) {
-        perp_tang -=
-            normalize((Vec2d)(closest_obstacle.position - cur_pos)) * 0.5;
-        normalize(perp_tang);
-      } else if (closest_obstacle.distance == LIDAR_MAX_DISTANCE) {
+      double dir = dot < 0 ? -1 : 1;
+      // Point away from the wall if perpendicular_tangent is not good
+      // engouh
+      Vec2d wall_vec =
+          normalize((Vec2d)(closest_obstacle.position - cur_pos)) * 0.15 * dir;
+      if (closest_obstacle.distance >= LIDAR_MAX_DISTANCE) {
+        // If we get too far away from the wall.
         std::println("Too far..");
+        // Change state to get back on track
         state = TanBugMode::ToGoal;
         break;
+      } else if (closest_obstacle.distance < MIN_DISTANCE_WALL) {
+        // Move away from wall
+        perp_tang = normalize(perp_tang - wall_vec);
+      } else {
+        // Move closer to wall
+        perp_tang = normalize(perp_tang + wall_vec);
       }
-      cur_dir = perp_tang * dir;
-      cur_pos = cur_pos + (Point2d)(perp_tang * dir * step_size);
 
-      dist_reach = distance(cur_pos, goal);
-      if (dist_reach <= dist_followed) {
+      // Update position
+      last_dir = cur_dir;
+      cur_dir = perp_tang * dir;
+      // Large changes in angle indicate a corner
+      if (abs(calculateAngle(cur_dir, last_dir)) > M_PI / 3.) {
+        Vec2d ccw_dir = rotationMatrix(M_PI / 2.) * last_dir;
+        Vec2d cw_dir = rotationMatrix(-M_PI / 2.) * last_dir;
+        double cur_len = LIDAR_MAX_DISTANCE;
+        double ccw_len = LIDAR_MAX_DISTANCE;
+        double cw_len = LIDAR_MAX_DISTANCE;
+        for (double len = LIDAR_DISTANCE_STEP; len < LIDAR_MAX_DISTANCE;
+             len += LIDAR_DISTANCE_STEP) {
+          Point2d new_pos = cur_pos + (Point2d)(cur_dir * len);
+          Point2d ccw_pos = cur_pos + (Point2d)(ccw_dir * len);
+          Point2d cw_pos = cur_pos + (Point2d)(cw_dir * len);
+
+          if (cur_len == LIDAR_MAX_DISTANCE && !is_free_space(new_pos, map)) {
+            cur_len = len;
+          }
+          if (ccw_len == LIDAR_MAX_DISTANCE && !is_free_space(ccw_pos, map)) {
+            ccw_len = len;
+          }
+          if (cw_len == LIDAR_MAX_DISTANCE && !is_free_space(cw_pos, map)) {
+            cw_len = len;
+          }
+        }
+        double max = std::max(cur_len, std::max(ccw_len, cw_len));
+        if (max == ccw_len) {
+          cur_dir = ccw_dir;
+        } else if (max == cw_len) {
+          cur_dir = cw_dir;
+        }
+        // Else keep original
+      }
+      Point2d temp_pos = cur_pos;
+      cur_pos = cur_pos + (Point2d)(perp_tang * dir * step_size);
+      if (!is_free_space(cur_pos, map)) {
+        // Use old pos for now
+        std::println("OHH not a good direction");
+        cur_pos = temp_pos;
+      }
+
+      dist_reach =
+          distance(best_q_point.position, goal) + best_q_point.distance;
+      if (dist_reach <= (dist_followed - step_size)) {
         state = TanBugMode::ToGoal;
       }
 
+      if (visited_positions.contains(
+              std::format("{},{}", (int)cur_pos.x, (int)cur_pos.y))) {
+        return false;
+      } else {
+        visited_positions.insert(
+            std::format("{},{}", (int)cur_pos.x, (int)cur_pos.y));
+      }
       break;
     }
     }
@@ -260,7 +353,7 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2d start,
               FONT_HERSHEY_SIMPLEX, 0.6, Scalar(0, 0, 0), 2);
       imshow(WINDOW_NAME, lidar_map);
     }
-    if (waitKey(10) == 'q') {
+    if (waitKey(5) == 'q') {
       return false;
     }
   }
@@ -289,25 +382,25 @@ void on_mouse(int event, int x, int y, int flags, void *userdata) {
 }
 
 Mat make_map() {
-  Mat img_ws1 = Mat::zeros(500, 500, CV_8UC3);
-  img_ws1 = Scalar(255, 255, 255);
-  rectangle(img_ws1, Point(100, 100), Point(400, 200), Scalar(0), FILLED);
-  circle(img_ws1, Point(100, 400), 50, Scalar(0), FILLED);
+  Mat map = Mat::zeros(500, 500, CV_8UC3);
+  map = Scalar(255, 255, 255);
+  rectangle(map, Point(100, 100), Point(400, 200), Scalar(0), FILLED);
+  circle(map, Point(100, 400), 50, Scalar(0), FILLED);
   Point triangle_pts[1][3];
   triangle_pts[0][0] = Point(200, 200);
   triangle_pts[0][1] = Point(400, 240);
   triangle_pts[0][2] = Point(350, 400);
   const Point *ppt[1] = {triangle_pts[0]};
   int npt[] = {3};
-  fillPoly(img_ws1, ppt, npt, 1, Scalar(0));
-  return img_ws1;
+  fillPoly(map, ppt, npt, 1, Scalar(0));
+  return map;
 }
 
 int main() {
   // Create a the map
   Mat img_ws1 = make_map();
   // Optionally load an image
-  img_ws1 = imread("../../../assets/ws4.png");
+  img_ws1 = imread("../../../assets/ws5.png");
   while (1) {
     // Make a copy of the map for the final path
     Mat img_final = img_ws1.clone();
