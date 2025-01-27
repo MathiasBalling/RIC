@@ -16,7 +16,7 @@ Point2d end_po;
 bool start_clicked = false;
 bool end_clicked = false;
 const std::string WINDOW_NAME = "Bug0";
-bool wall_right = true;
+bool wall_right = false;
 
 double distance(Point2d p1, Point2d p2) { return norm(p2 - p1); }
 
@@ -74,8 +74,9 @@ bool straight_line_to_goal(Point2d p, Point2d goal, double step_size,
 double deg2rad(double deg) { return deg * M_PI / 180; }
 
 bool is_at_wall(Point2d p, double step_size, const Mat &map) {
-  for (int x = -2; x <= 2; x++) {
-    for (int y = -2; y <= 2; y++) {
+  step_size -= 1.;
+  for (int x = -step_size; x <= step_size; x++) {
+    for (int y = -step_size; y <= step_size; y++) {
       Point2d point = p + Point2d(x, y);
       if (!is_free_space(point, map)) {
         return true;
@@ -130,19 +131,20 @@ bool bug0_algorithm(const Mat &map, Mat &final_map, const Point2d start,
     Point2d goal_dir_pos = move_toward_goal(current, goal, step_size);
     // Draw the line on the final map
     circle(final_map, current, step_size / 1.5, Scalar(0, 0, 255), FILLED);
-    imshow(WINDOW_NAME, final_map);
-    if (waitKey(2) == 'q') {
-      return false;
-    }
+    Mat temp = final_map.clone();
     if (is_free_space(goal_dir_pos, map) &&
-        !is_at_wall(current, step_size, map)) {
+        !is_at_wall(goal_dir_pos, step_size, map)) {
       last_position = current;
       current = goal_dir_pos;
     } else {
       Vec2d dir = normalize((Vec2d)(current - last_position));
       Point2d best_point = current;
+      int start_angle = 0;
+      if (!is_free_space(current + (Point2d)(dir * step_size * 2), map)) {
+        start_angle = 135;
+      }
       if (wall_right) {
-        for (int i = 45; i > -180; i -= 10) {
+        for (int i = (135 - start_angle); i > -135; i -= 5) {
           Vec2d r = rotationMatrix(deg2rad(i)) * dir * step_size;
           Point2d np = current + (Point2d)r;
           if (is_free_space(np, map) && is_at_wall(np, step_size, map)) {
@@ -151,7 +153,7 @@ bool bug0_algorithm(const Mat &map, Mat &final_map, const Point2d start,
           }
         }
       } else {
-        for (int i = -45; i < 180; i += 10) {
+        for (int i = -(135 - start_angle); i < 135; i += 5) {
           Vec2d r = rotationMatrix(deg2rad(i)) * dir * step_size;
           Point2d np = current + (Point2d)r;
           if (is_free_space(np, map) && is_at_wall(np, step_size, map)) {
@@ -160,13 +162,16 @@ bool bug0_algorithm(const Mat &map, Mat &final_map, const Point2d start,
           }
         }
       }
-      last_position = current;
-
-      if (straight_line_to_goal(current, goal, step_size, map)) {
-        current = goal_dir_pos;
-      } else {
+      if (best_point != current) {
+        last_position = current;
         current = best_point;
+      } else {
+        std::println("Stuck");
       }
+    }
+    imshow(WINDOW_NAME, temp);
+    if (waitKey(4) == 'q') {
+      return false;
     }
     path.push_back(current);
   }
@@ -192,7 +197,7 @@ int main() {
   int npt[] = {3};
   fillPoly(img_ws1, ppt, npt, 1, Scalar(0));
 
-  img_ws1 = imread("../../../assets/ws3.png");
+  img_ws1 = imread("../../../assets/ws5.png");
 
   namedWindow(WINDOW_NAME);                          // Create the window
   setMouseCallback(WINDOW_NAME, on_mouse, &img_ws1); // Set the on_mouse
