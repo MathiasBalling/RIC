@@ -109,13 +109,13 @@ LidarData find_closest_O_point(std::vector<LidarData> lidar, Point2d goal) {
 
   LidarData closest_O_point = O_points.at(0);
   // Use the heuristic: d(x,Oi) + d(Oi,goal)
-  double closest_O_point_dist =
+  double closest_O_point_hueristic =
       distance(closest_O_point.position, goal) + closest_O_point.distance;
-  for (const auto O : O_points) {
+  for (const auto &O : O_points) {
     double p_dist = distance(O.position, goal) + O.distance;
-    if (p_dist < closest_O_point_dist) {
+    if (p_dist < closest_O_point_hueristic) {
       closest_O_point = O;
-      closest_O_point_dist = p_dist;
+      closest_O_point_hueristic = p_dist;
     }
   }
   return closest_O_point;
@@ -141,7 +141,7 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2d start,
   Vec2d last_dir = normalize((Vec2d)(cur_pos - goal));
 
   double dist_reach = distance(start, goal);
-  double dist_followed = dist_reach;
+  double dist_min = dist_reach;
 
   std::unordered_set<std::string> visited_positions;
   visited_positions.insert(std::format("{},{}", (int)start.x, (int)start.y));
@@ -172,9 +172,7 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2d start,
            len += LIDAR_DISTANCE_STEP) {
         Vec2d dir_len = direction_i * len;
         direction_end = cur_pos + (Point2d)dir_len;
-
         if (!is_free_space(direction_end, map)) {
-          direction_end = cur_pos + (Point2d)dir_len;
           max_steps = len;
           break;
         }
@@ -227,8 +225,8 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2d start,
         // Check if we are moving closer
         double best_O_point_hueristic =
             distance(best_O_point.position, goal) + best_O_point.distance;
-        if (best_O_point_hueristic <= dist_followed) {
-          dist_followed = best_O_point_hueristic;
+        if (best_O_point_hueristic <= dist_min) {
+          dist_min = best_O_point_hueristic;
         } else {
           state = TanBugMode::BoundaryFollowing;
           break;
@@ -337,7 +335,7 @@ bool bug_tan_algorithm(const Mat &map, Mat &final_map, const Point2d start,
 
       dist_reach =
           distance(best_O_point.position, goal) + best_O_point.distance;
-      if (dist_reach <= (dist_followed - step_size)) {
+      if (dist_reach < (dist_min - step_size)) {
         state = TanBugMode::ToGoal;
       }
 

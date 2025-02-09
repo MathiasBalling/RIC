@@ -6,7 +6,7 @@
 using namespace cv;
 
 Point start_pos;
-Point end_po;
+Point end_pos;
 bool start_clicked = false;
 bool end_clicked = false;
 const std::string WINDOW_NAME = "Bug0";
@@ -50,9 +50,9 @@ void on_mouse(int event, int x, int y, int flags, void *userdata) {
         start_clicked = true;
         std::println("Start position: ({}, {})\n", start_pos.x, start_pos.y);
       } else if (!end_clicked) {
-        end_po = Point(x, y);
+        end_pos = Point(x, y);
         end_clicked = true;
-        std::println("End position: ({}, {})\n", end_po.x, end_po.y);
+        std::println("End position: ({}, {})\n", end_pos.x, end_pos.y);
       }
     } else {
       std::println("Invalid start position. Please select a white pixel.\n");
@@ -129,7 +129,7 @@ int main() {
       circle(img_ws1_temp, start_pos, 5, Scalar(0, 0, 255), FILLED);
     }
     if (end_clicked) {
-      circle(img_ws1_temp, end_po, 5, Scalar(0, 0, 255), FILLED);
+      circle(img_ws1_temp, end_pos, 5, Scalar(0, 0, 255), FILLED);
       img_final = img_ws1_temp.clone();
       break;
     }
@@ -143,8 +143,8 @@ int main() {
 
   // Analyze the image
   std::println("Analyzing the image...");
-  std::println("Distance to goal: {:.0f}", distance(start_pos, end_po));
-  if (bug0_algorithm(img_ws1, img_final, start_pos, end_po)) {
+  std::println("Distance to goal: {:.0f}", distance(start_pos, end_pos));
+  if (bug0_algorithm(img_ws1, img_final, start_pos, end_pos)) {
     std::println("Goal reached!");
   } else {
     std::println("Goal not reached!");

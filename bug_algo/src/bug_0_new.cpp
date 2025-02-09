@@ -12,11 +12,11 @@
 using namespace cv;
 
 Point2d start_pos;
-Point2d end_po;
+Point2d end_pos;
 bool start_clicked = false;
 bool end_clicked = false;
 const std::string WINDOW_NAME = "Bug0";
-bool wall_right = false;
+bool wall_right = true;
 
 double distance(Point2d p1, Point2d p2) { return norm(p2 - p1); }
 
@@ -112,9 +112,9 @@ void on_mouse(int event, int x, int y, int flags, void *userdata) {
         start_clicked = true;
         std::println("Start position: ({}, {})\n", start_pos.x, start_pos.y);
       } else if (!end_clicked) {
-        end_po = Point2d(x, y);
+        end_pos = Point2d(x, y);
         end_clicked = true;
-        std::println("End position: ({}, {})\n", end_po.x, end_po.y);
+        std::println("End position: ({}, {})\n", end_pos.x, end_pos.y);
       }
     } else {
       std::println("Invalid start position. Please select a white pixel.\n");
@@ -125,28 +125,28 @@ void on_mouse(int event, int x, int y, int flags, void *userdata) {
 bool bug0_algorithm(const Mat &map, Mat &final_map, const Point2d start,
                     const Point2d goal, const double step_size = 3.) {
   std::vector<Point2d> path = {start};
-  Point2d current = start;
+  Point2d cur_pos = start;
   Point2d last_position = Point2d(-10, -10);
-  while (distance(current, goal) > step_size) {
-    Point2d goal_dir_pos = move_toward_goal(current, goal, step_size);
+  while (distance(cur_pos, goal) > step_size) {
+    Point2d goal_dir_pos = move_toward_goal(cur_pos, goal, step_size);
     // Draw the line on the final map
-    circle(final_map, current, step_size / 1.5, Scalar(0, 0, 255), FILLED);
+    circle(final_map, cur_pos, step_size / 1.5, Scalar(0, 0, 255), FILLED);
     Mat temp = final_map.clone();
     if (is_free_space(goal_dir_pos, map) &&
         !is_at_wall(goal_dir_pos, step_size, map)) {
-      last_position = current;
-      current = goal_dir_pos;
+      last_position = cur_pos;
+      cur_pos = goal_dir_pos;
     } else {
-      Vec2d dir = normalize((Vec2d)(current - last_position));
-      Point2d best_point = current;
+      Vec2d dir = normalize((Vec2d)(cur_pos - last_position));
+      Point2d best_point = cur_pos;
       int start_angle = 0;
-      if (!is_free_space(current + (Point2d)(dir * step_size * 2), map)) {
+      if (!is_free_space(cur_pos + (Point2d)(dir * step_size * 2), map)) {
         start_angle = 135;
       }
       if (wall_right) {
         for (int i = (135 - start_angle); i > -135; i -= 5) {
           Vec2d r = rotationMatrix(deg2rad(i)) * dir * step_size;
-          Point2d np = current + (Point2d)r;
+          Point2d np = cur_pos + (Point2d)r;
           if (is_free_space(np, map) && is_at_wall(np, step_size, map)) {
             best_point = np;
             break;
@@ -155,16 +155,16 @@ bool bug0_algorithm(const Mat &map, Mat &final_map, const Point2d start,
       } else {
         for (int i = -(135 - start_angle); i < 135; i += 5) {
           Vec2d r = rotationMatrix(deg2rad(i)) * dir * step_size;
-          Point2d np = current + (Point2d)r;
+          Point2d np = cur_pos + (Point2d)r;
           if (is_free_space(np, map) && is_at_wall(np, step_size, map)) {
             best_point = np;
             break;
           }
         }
       }
-      if (best_point != current) {
-        last_position = current;
-        current = best_point;
+      if (best_point != cur_pos) {
+        last_position = cur_pos;
+        cur_pos = best_point;
       } else {
         std::println("Stuck");
       }
@@ -173,7 +173,7 @@ bool bug0_algorithm(const Mat &map, Mat &final_map, const Point2d start,
     if (waitKey(4) == 'q') {
       return false;
     }
-    path.push_back(current);
+    path.push_back(cur_pos);
   }
 
   std::println("Len: {}", path_distance(path));
@@ -197,7 +197,7 @@ int main() {
   int npt[] = {3};
   fillPoly(img_ws1, ppt, npt, 1, Scalar(0));
 
-  img_ws1 = imread("../../../assets/ws5.png");
+  img_ws1 = imread("../../../assets/ws3.png");
 
   namedWindow(WINDOW_NAME);                          // Create the window
   setMouseCallback(WINDOW_NAME, on_mouse, &img_ws1); // Set the on_mouse
@@ -208,7 +208,7 @@ int main() {
       circle(img_ws1_temp, start_pos, 5, Scalar(0, 0, 255), FILLED);
     }
     if (end_clicked) {
-      circle(img_ws1_temp, end_po, 5, Scalar(0, 0, 255), FILLED);
+      circle(img_ws1_temp, end_pos, 5, Scalar(0, 0, 255), FILLED);
       img_final = img_ws1_temp.clone();
       break;
     }
@@ -222,8 +222,8 @@ int main() {
 
   // Analyze the image
   std::println("Analyzing the image...");
-  std::println("Distance to goal: {:.0f}", distance(start_pos, end_po));
-  if (bug0_algorithm(img_ws1, img_final, start_pos, end_po)) {
+  std::println("Distance to goal: {:.0f}", distance(start_pos, end_pos));
+  if (bug0_algorithm(img_ws1, img_final, start_pos, end_pos)) {
     std::println("Goal reached!");
   } else {
     std::println("Goal not reached!");
